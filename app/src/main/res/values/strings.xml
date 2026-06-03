@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AutoClicker</string>
+    <string name="accessibility_service_description">自动连点器服务，用于在指定位置模拟重复点击操作。开启后可通过悬浮球控制点击的开始和停止。</string>
+
+    <!-- 首页 -->
+    <string name="home_title">AutoClicker</string>
+    <string name="home_subtitle">自动连点器</string>
+    <string name="accessibility_service_label">无障碍服务</string>
+    <string name="accessibility_service_desc">用于模拟点击手势，必须开启</string>
+    <string name="overlay_permission_label">悬浮窗权限</string>
+    <string name="overlay_permission_desc">用于显示控制悬浮球</string>
+    <string name="toolbar_clicker">连点器</string>
+    <string name="status_on">已开启</string>
+    <string name="status_off">未开启</string>
+
+    <!-- 连点器页面 -->
+    <string name="clicker_title">连点器</string>
+    <string name="interval_label">点击间隔（毫秒）</string>
+    <string name="count_label">点击次数</string>
+    <string name="count_infinite">无限</string>
+    <string name="btn_start">开始连点</string>
+    <string name="btn_stop">停止连点</string>
+    <string name="hint_interval">1 ~ 60000</string>
+    <string name="hint_count">1 ~ 99999</string>
+
+    <!-- 悬浮球 -->
+    <string name="floating_ball_hint">拖动定位，单击开始/停止</string>
+
+    <!-- 抢购 -->
+    <string name="toolbar_rush_buy">抢购</string>
+
+    <!-- OCR模式 -->
+    <string name="ocr_mode_title">OCR文字识别</string>
+    <string name="ocr_target_text_hint">输入要匹配的文字</string>
+    <string name="ocr_start">开始OCR识别</string>
+    <string name="ocr_stop">停止OCR识别</string>
+    <string name="ocr_running">OCR扫描中...</string>
+    <string name="ocr_matched">已匹配到目标文字！</string>
+    <string name="ocr_clicking">正在点击目标位置...</string>
+    <string name="ocr_no_permission">请先开启无障碍服务和悬浮窗权限</string>
+    <string name="ocr_capture_permission">需要屏幕录制权限才能截屏识别</string>
+    <string name="ocr_empty_target">请先输入目标文字</string>
+</resources>
