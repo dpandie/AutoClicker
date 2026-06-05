@@ -305,6 +305,7 @@ class AutoClickerActivity : AppCompatActivity() {
         super.onResume()
         updateCoordinateUI()
         updateOcrUI()
+        WatermarkHelper.apply(this)
         startStatusUpdate()
     }
 

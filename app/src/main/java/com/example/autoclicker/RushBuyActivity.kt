@@ -121,6 +121,7 @@ class RushBuyActivity : AppCompatActivity() {
         loadCoordinatesFromService()
         updateUI()
         startStatusUpdate()
+        WatermarkHelper.apply(this)
     }
 
     override fun onPause() {

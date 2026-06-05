@@ -85,6 +85,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updatePermissionStatus()
+        WatermarkHelper.apply(this)
     }
 
     /** 更新权限状态显示 */
