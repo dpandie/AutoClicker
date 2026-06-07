@@ -58,46 +58,45 @@ class ClickAccessibilityService : AccessibilityService() {
 
         fun getLocatedCoordinates(): Pair<Int, Int>? = instance?.locatedCoordinates
 
-        /** 显示悬浮倒计时 */
         fun showFloatingTime(triggerTime: Long) {
             instance?.showFloatingTimeInternal(triggerTime)
         }
 
-        /** 更新悬浮倒计时 */
         fun updateFloatingTime(remaining: Long) {
             instance?.updateFloatingTimeInternal(remaining)
         }
 
-        /** 移除悬浮倒计时 */
         fun removeFloatingTime() {
             instance?.removeFloatingTimeInternal()
         }
 
-        /** 在指定坐标执行模拟点击（供 OCR 服务调用） */
         fun performClickAt(x: Float, y: Float) {
             instance?.performClickAt(x, y)
         }
 
-        /** OCR 模式是否可用（服务运行中） */
         fun isOcrReady(): Boolean = instance != null
     }
 
-    // 连点器悬浮球
+    // ==================== 悬浮球相关 ====================
     private var floatingView: View? = null
-    private var layoutParams: WindowManager.LayoutParams? = null
+    private var floatingBallSizePx = 0
 
-    // 定位悬浮窗
+    // 停止按钮（连点运行时显示）
+    private var stopBtnView: View? = null
+
+    // ==================== 定位悬浮窗 ====================
     private var locateView: View? = null
     private var locateParams: WindowManager.LayoutParams? = null
     private var locatedCoordinates: Pair<Int, Int>? = null
+    private var locateBallSizePx = 0
 
-    // 悬浮倒计时
+    // ==================== 悬浮倒计时 ====================
     private var floatingTimeView: View? = null
     private var floatingTimeParams: WindowManager.LayoutParams? = null
     private var floatingTimeTextView: TextView? = null
     private var triggerTimeMs: Long = 0L
 
-    // 通用
+    // ==================== 通用 ====================
     private var windowManager: WindowManager? = null
     private var handler: Handler? = null
     private var clickRunnable: Runnable? = null
@@ -113,12 +112,20 @@ class ClickAccessibilityService : AccessibilityService() {
     private var rushBuyY: Int = 0
     private var isRushBuyMode = false
 
-    // 连点器悬浮球触摸
+    // 触摸拖拽状态
     private var initialX = 0
     private var initialY = 0
     private var initialTouchX = 0f
     private var initialTouchY = 0f
     private var touchDownTime = 0L
+    private var isLongPressTriggered = false
+
+    // 长按删除相关
+    private val longPressTimeout = 800L
+    private val longPressRunnable = Runnable {
+        isLongPressTriggered = true
+        removeFloatingWindow()
+    }
 
     // 定位悬浮窗触摸
     private var locateInitialX = 0
@@ -126,6 +133,8 @@ class ClickAccessibilityService : AccessibilityService() {
     private var locateInitialTouchX = 0f
     private var locateInitialTouchY = 0f
     private var locateTouchDownTime = 0L
+
+    // ==================== 生命周期 ====================
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -152,83 +161,92 @@ class ClickAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: android.view.accessibility.AccessibilityEvent?) {}
     override fun onInterrupt() {}
 
-    // ==================== 连点器悬浮球 ====================
+    // ==================== 悬浮球（三态交互）====================
+    //
+    // 空闲态：悬浮球可拖动 + 可点击（点击进入连点态）
+    // 连点态：悬浮球 FLAG_NOT_TOUCHABLE（让 dispatchGesture 穿透）+ 显示停止按钮
+    // 停止态：恢复空闲态
+    //
 
     private fun showFloatingWindow() {
         if (floatingView != null) return
 
-        val sizePx = dpToPx(60)
-        val ball = View(this).apply {
-            background = createCircleDrawable(0xCC000000.toInt())
+        floatingBallSizePx = dpToPx(60)
+        val ball = FloatingButtonView(this).apply {
+            number = 1
+            isActive = false
         }
 
-        val params = WindowManager.LayoutParams(
-            sizePx, sizePx,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = (windowManager?.defaultDisplay?.width ?: 1080) / 2 - sizePx / 2
-            y = (windowManager?.defaultDisplay?.height ?: 1920) / 2 - sizePx / 2
+        val params = createOverlayParams(floatingBallSizePx, floatingBallSizePx).apply {
+            x = (windowManager?.defaultDisplay?.width ?: 1080) / 2 - floatingBallSizePx / 2
+            y = (windowManager?.defaultDisplay?.height ?: 1920) / 2 - floatingBallSizePx / 2
         }
 
-        layoutParams = params
-
-        ball.setOnTouchListener { _, event ->
-            handleFloatingBallTouch(event)
-            true
+        ball.setOnTouchListener { v, event ->
+            handleBallTouch(v, event)
         }
 
         floatingView = ball
-        try {
-            windowManager?.addView(ball, params)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        try { windowManager?.addView(ball, params) } catch (e: Exception) { e.printStackTrace() }
     }
 
-    private fun handleFloatingBallTouch(event: MotionEvent): Boolean {
-        val params = layoutParams ?: return false
+    private fun handleBallTouch(view: View, event: MotionEvent): Boolean {
+        val lp = view.layoutParams as? WindowManager.LayoutParams ?: return false
+        val action = event.actionMasked
 
-        when (event.action) {
+        when (action) {
             MotionEvent.ACTION_DOWN -> {
-                initialX = params.x
-                initialY = params.y
+                initialX = lp.x
+                initialY = lp.y
                 initialTouchX = event.rawX
                 initialTouchY = event.rawY
                 touchDownTime = System.currentTimeMillis()
+                isLongPressTriggered = false
+                handler?.postDelayed(longPressRunnable, longPressTimeout)
             }
 
             MotionEvent.ACTION_MOVE -> {
-                params.x = initialX + (event.rawX - initialTouchX).toInt()
-                params.y = initialY + (event.rawY - initialTouchY).toInt()
-                try {
-                    windowManager?.updateViewLayout(floatingView, params)
-                } catch (e: Exception) {
-                    e.printStackTrace()
+                val dx = event.rawX - initialTouchX
+                val dy = event.rawY - initialTouchY
+                val dist = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
+                // 移动超过阈值则取消长按
+                if (dist > 10f) {
+                    handler?.removeCallbacks(longPressRunnable)
+                }
+                if (!isLongPressTriggered) {
+                    lp.x = initialX + dx.toInt()
+                    lp.y = initialY + dy.toInt()
+                    try { windowManager?.updateViewLayout(view, lp) } catch (_: Exception) {}
                 }
             }
 
             MotionEvent.ACTION_UP -> {
+                handler?.removeCallbacks(longPressRunnable)
+                if (isLongPressTriggered) {
+                    isLongPressTriggered = false
+                    return true
+                }
                 val dx = event.rawX - initialTouchX
                 val dy = event.rawY - initialTouchY
-                val distance = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
-                val duration = System.currentTimeMillis() - touchDownTime
+                val dist = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
+                val dur = System.currentTimeMillis() - touchDownTime
 
-                if (distance < 10f && duration < 300) {
-                    if (isClickingNow) {
-                        stopClickingInternal()
-                    } else {
-                        startClickingInternal()
-                    }
+                if (dist < 15f && dur < 500) {
+                    // 点击 → 开始连点
+                    startClickingInternal()
                 }
+            }
+
+            MotionEvent.ACTION_CANCEL -> {
+                handler?.removeCallbacks(longPressRunnable)
+                isLongPressTriggered = false
             }
         }
         return true
     }
 
-    /** 连点器模式：单击悬浮球开始连点 */
+    // ==================== 连点器核心 ====================
+
     private fun startClickingInternal() {
         if (isClickingNow) return
         isClickingNow = true
@@ -240,16 +258,27 @@ class ClickAccessibilityService : AccessibilityService() {
         isInfiniteMode = prefs.getBoolean("click_infinite", true)
         targetCount = prefs.getLong("click_count", 100L)
 
-        updateBallColor(0xCCFF0000.toInt())
+        // 1. 球变红
+        (floatingView as? FloatingButtonView)?.isActive = true
 
+        // 2. 球设为不可触摸（让 dispatchGesture 穿透到下层）
+        setBallTouchable(false)
+
+        // 3. 显示停止按钮
+        showStopButton()
+
+        // 4. 开始连点循环
         clickRunnable = object : Runnable {
             override fun run() {
                 if (!isClickingNow) return
 
-                val params = layoutParams ?: return
                 val view = floatingView ?: return
-                val clickX = (params.x + view.width / 2).toFloat()
-                val clickY = (params.y + view.height / 2).toFloat()
+                val loc = IntArray(2)
+                view.getLocationOnScreen(loc)
+                val w = if (view.width > 0) view.width else floatingBallSizePx
+                val h = if (view.height > 0) view.height else floatingBallSizePx
+                val clickX = (loc[0] + w / 2).toFloat()
+                val clickY = (loc[1] + h / 2).toFloat()
                 performClickAt(clickX, clickY)
 
                 clickedCount++
@@ -261,6 +290,18 @@ class ClickAccessibilityService : AccessibilityService() {
             }
         }
         handler?.post(clickRunnable!!)
+    }
+
+    private fun stopClickingInternal() {
+        isClickingNow = false
+        isRushBuyMode = false
+        clickRunnable?.let { handler?.removeCallbacks(it) }
+        clickRunnable = null
+
+        // 恢复球为空闲态
+        (floatingView as? FloatingButtonView)?.isActive = false
+        setBallTouchable(true)
+        removeStopButton()
     }
 
     /** 连点器入口：显示悬浮球 */
@@ -280,6 +321,61 @@ class ClickAccessibilityService : AccessibilityService() {
         if (floatingView == null) {
             showFloatingWindow()
         }
+    }
+
+    // ==================== 停止按钮 ====================
+
+    private fun showStopButton() {
+        if (stopBtnView != null) return
+        val size = dpToPx(36)
+
+        val btn = TextView(this).apply {
+            text = "■"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 16f
+            gravity = Gravity.CENTER
+            val bg = GradientDrawable().apply {
+                setColor(0xCCFF4444.toInt())
+                cornerRadius = 8f * resources.displayMetrics.density
+            }
+            background = bg
+        }
+
+        // 停止按钮放在球的右侧
+        val ballLp = floatingView?.layoutParams as? WindowManager.LayoutParams
+        val x = (ballLp?.x ?: 0) + floatingBallSizePx + dpToPx(8)
+        val y = (ballLp?.y ?: 0) + (floatingBallSizePx - size) / 2
+
+        val params = createOverlayParams(size, size).apply {
+            this.x = x
+            this.y = y
+        }
+
+        btn.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_UP) {
+                stopClickingInternal()
+            }
+            true
+        }
+
+        stopBtnView = btn
+        try { windowManager?.addView(btn, params) } catch (_: Exception) {}
+    }
+
+    private fun removeStopButton() {
+        try { stopBtnView?.let { windowManager?.removeView(it) } } catch (_: Exception) {}
+        stopBtnView = null
+    }
+
+    private fun setBallTouchable(touchable: Boolean) {
+        val view = floatingView ?: return
+        val lp = view.layoutParams as? WindowManager.LayoutParams ?: return
+        if (touchable) {
+            lp.flags = lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+        } else {
+            lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        }
+        try { windowManager?.updateViewLayout(view, lp) } catch (_: Exception) {}
     }
 
     // ==================== 抢购模式坐标点击 ====================
@@ -318,49 +414,29 @@ class ClickAccessibilityService : AccessibilityService() {
         removeLocateOverlayInternal()
         locatedCoordinates = null
 
-        val sizePx = dpToPx(80)
+        locateBallSizePx = dpToPx(80)
 
-        val container = FrameLayout(this)
-
-        // 外圈
-        val ring = View(this).apply {
-            background = createRingDrawable()
-            layoutParams = FrameLayout.LayoutParams(sizePx, sizePx, Gravity.CENTER)
+        val ball = FloatingButtonView(this).apply {
+            number = 1
+            ringColor = 0xFFFF9800.toInt()  // 橙色边框，定位风格
+            textColor = 0xFFFF9800.toInt()
+            isActive = false
         }
-        container.addView(ring)
 
-        // 中心点
-        val centerSize = dpToPx(8)
-        val centerDot = View(this).apply {
-            background = createCircleDrawable(0xFFFF9800.toInt())
-            layoutParams = FrameLayout.LayoutParams(centerSize, centerSize, Gravity.CENTER)
-        }
-        container.addView(centerDot)
-
-        val params = WindowManager.LayoutParams(
-            sizePx, sizePx,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            this.x = x - sizePx / 2
-            this.y = y - sizePx / 2
+        val params = createOverlayParams(locateBallSizePx, locateBallSizePx).apply {
+            this.x = x - locateBallSizePx / 2
+            this.y = y - locateBallSizePx / 2
         }
 
         locateParams = params
 
-        container.setOnTouchListener { _, event ->
+        ball.setOnTouchListener { _, event ->
             handleLocateTouch(event)
             true
         }
 
-        locateView = container
-        try {
-            windowManager?.addView(container, params)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        locateView = ball
+        try { windowManager?.addView(ball, params) } catch (e: Exception) { e.printStackTrace() }
     }
 
     private fun handleLocateTouch(event: MotionEvent): Boolean {
@@ -378,11 +454,7 @@ class ClickAccessibilityService : AccessibilityService() {
             MotionEvent.ACTION_MOVE -> {
                 params.x = locateInitialX + (event.rawX - locateInitialTouchX).toInt()
                 params.y = locateInitialY + (event.rawY - locateInitialTouchY).toInt()
-                try {
-                    windowManager?.updateViewLayout(locateView, params)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                try { windowManager?.updateViewLayout(locateView, params) } catch (e: Exception) { e.printStackTrace() }
             }
 
             MotionEvent.ACTION_UP -> {
@@ -392,9 +464,12 @@ class ClickAccessibilityService : AccessibilityService() {
                 val duration = System.currentTimeMillis() - locateTouchDownTime
 
                 if (distance < 10f && duration < 300) {
-                    // 单击确认坐标
-                    val sizePx = dpToPx(80)
-                    locatedCoordinates = Pair(params.x + sizePx / 2, params.y + sizePx / 2)
+                    // 点击确认 → 记录中心坐标并移除
+                    val loc = IntArray(2)
+                    locateView?.getLocationOnScreen(loc)
+                    val w = locateView?.width?.takeIf { it > 0 } ?: locateBallSizePx
+                    val h = locateView?.height?.takeIf { it > 0 } ?: locateBallSizePx
+                    locatedCoordinates = Pair(loc[0] + w / 2, loc[1] + h / 2)
                     removeLocateOverlayInternal()
                 }
             }
@@ -403,11 +478,7 @@ class ClickAccessibilityService : AccessibilityService() {
     }
 
     private fun removeLocateOverlayInternal() {
-        try {
-            locateView?.let { windowManager?.removeView(it) }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        try { locateView?.let { windowManager?.removeView(it) } } catch (e: Exception) { e.printStackTrace() }
         locateView = null
         locateParams = null
     }
@@ -452,7 +523,6 @@ class ClickAccessibilityService : AccessibilityService() {
             y = 60
         }
 
-        // 拖动
         var dragInitialX = 0
         var dragInitialY = 0
         var dragTouchX = 0f
@@ -482,11 +552,7 @@ class ClickAccessibilityService : AccessibilityService() {
 
         floatingTimeParams = params
         floatingTimeView = container
-        try {
-            windowManager?.addView(container, params)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        try { windowManager?.addView(container, params) } catch (e: Exception) { e.printStackTrace() }
     }
 
     private fun updateFloatingTimeInternal(remaining: Long) {
@@ -497,7 +563,6 @@ class ClickAccessibilityService : AccessibilityService() {
         val h = secs / 3600
         val m = (secs % 3600) / 60
         val s = secs % 60
-        // 当前时间（含毫秒）
         val now = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
             .format(java.util.Date())
         try {
@@ -506,9 +571,7 @@ class ClickAccessibilityService : AccessibilityService() {
     }
 
     private fun removeFloatingTimeInternal() {
-        try {
-            floatingTimeView?.let { windowManager?.removeView(it) }
-        } catch (_: Exception) {}
+        try { floatingTimeView?.let { windowManager?.removeView(it) } } catch (_: Exception) {}
         floatingTimeView = null
         floatingTimeParams = null
         floatingTimeTextView = null
@@ -516,15 +579,6 @@ class ClickAccessibilityService : AccessibilityService() {
 
     // ==================== 通用方法 ====================
 
-    private fun stopClickingInternal() {
-        isClickingNow = false
-        isRushBuyMode = false
-        clickRunnable?.let { handler?.removeCallbacks(it) }
-        clickRunnable = null
-        removeFloatingWindow()
-    }
-
-    /** 在指定坐标执行模拟点击手势 */
     private fun performClickAt(x: Float, y: Float) {
         val path = Path().apply {
             moveTo(x, y)
@@ -539,22 +593,24 @@ class ClickAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun updateBallColor(color: Int) {
-        try {
-            floatingView?.background = createCircleDrawable(color)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+    private fun removeFloatingWindow() {
+        handler?.removeCallbacks(longPressRunnable)
+        removeStopButton()
+        try { floatingView?.let { windowManager?.removeView(it) } } catch (e: Exception) { e.printStackTrace() }
+        floatingView = null
+        isLongPressTriggered = false
     }
 
-    private fun removeFloatingWindow() {
-        try {
-            floatingView?.let { windowManager?.removeView(it) }
-        } catch (e: Exception) {
-            e.printStackTrace()
+    /** 创建标准 overlay LayoutParams */
+    private fun createOverlayParams(width: Int, height: Int): WindowManager.LayoutParams {
+        return WindowManager.LayoutParams(
+            width, height,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
         }
-        floatingView = null
-        layoutParams = null
     }
 
     private fun createCircleDrawable(color: Int): GradientDrawable {
@@ -567,8 +623,8 @@ class ClickAccessibilityService : AccessibilityService() {
     private fun createRingDrawable(): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.OVAL
-            setColor(0x00000000) // 透明填充
-            setStroke(dpToPx(3), 0xFFFF9800.toInt()) // 橙色描边
+            setColor(0x00000000)
+            setStroke(dpToPx(3), 0xFFFF9800.toInt())
         }
     }
 
