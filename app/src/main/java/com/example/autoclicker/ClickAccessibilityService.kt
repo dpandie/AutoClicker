@@ -13,6 +13,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 
 class ClickAccessibilityService : AccessibilityService() {
@@ -75,6 +77,32 @@ class ClickAccessibilityService : AccessibilityService() {
         }
 
         fun isOcrReady(): Boolean = instance != null
+
+        // ==================== 抢票引擎 ====================
+        fun getTicketGrabEngine(): TicketGrabEngine? = instance?.ticketGrabEngine
+
+        fun startTicketGrab(config: TicketGrabEngine.Config) {
+            instance?.ticketGrabEngine?.start(config)
+        }
+
+        fun stopTicketGrab() {
+            instance?.ticketGrabEngine?.stop()
+        }
+
+        fun isTicketGrabRunning(): Boolean = instance?.ticketGrabEngine?.isRunning() == true
+
+        // ==================== 抢票悬浮日志 ====================
+        fun showFloatingLog() {
+            instance?.showFloatingLogInternal()
+        }
+
+        fun appendTicketLog(msg: String) {
+            instance?.appendFloatingLogInternal(msg)
+        }
+
+        fun removeFloatingLog() {
+            instance?.removeFloatingLogInternal()
+        }
     }
 
     // ==================== 悬浮球相关 ====================
@@ -111,6 +139,17 @@ class ClickAccessibilityService : AccessibilityService() {
     private var rushBuyX: Int = 0
     private var rushBuyY: Int = 0
     private var isRushBuyMode = false
+
+    // 抢票引擎
+    private val ticketGrabEngine = TicketGrabEngine(this)
+
+    // ==================== 悬浮日志窗 ====================
+    private var floatingLogView: View? = null
+    private var floatingLogParams: WindowManager.LayoutParams? = null
+    private var floatingLogTextView: TextView? = null
+    private var floatingLogCollapsed = false
+    private val logLines = mutableListOf<String>()
+    private val maxLogLines = 50
 
     // 触摸拖拽状态
     private var initialX = 0
@@ -155,10 +194,18 @@ class ClickAccessibilityService : AccessibilityService() {
         removeFloatingWindow()
         removeLocateOverlayInternal()
         removeFloatingTimeInternal()
+        removeFloatingLogInternal()
+        ticketGrabEngine.stop()
         instance = null
     }
 
-    override fun onAccessibilityEvent(event: android.view.accessibility.AccessibilityEvent?) {}
+    override fun onAccessibilityEvent(event: android.view.accessibility.AccessibilityEvent?) {
+        event ?: return
+        // 分发给抢票引擎
+        if (ticketGrabEngine.isRunning()) {
+            ticketGrabEngine.onEvent(event)
+        }
+    }
     override fun onInterrupt() {}
 
     // ==================== 悬浮球（三态交互）====================
@@ -575,6 +622,194 @@ class ClickAccessibilityService : AccessibilityService() {
         floatingTimeView = null
         floatingTimeParams = null
         floatingTimeTextView = null
+    }
+
+    // ==================== 悬浮日志窗 ====================
+
+    private fun showFloatingLogInternal() {
+        removeFloatingLogInternal()
+        logLines.clear()
+        floatingLogCollapsed = false
+
+        val logWidth = dpToPx(300)
+        val logMaxHeight = dpToPx(220)
+        val titleBarHeight = dpToPx(32)
+
+        val container = FrameLayout(this)
+
+        // 标题栏
+        val titleBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            val bg = GradientDrawable().apply {
+                setColor(0xE0E91E63.toInt())
+                cornerRadius = 12f * resources.displayMetrics.density
+            }
+            // 只圆角顶部
+            background = bg
+            setPadding(dpToPx(12), 0, dpToPx(8), 0)
+        }
+
+        val titleText = TextView(this).apply {
+            text = "抢票日志"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 13f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, FrameLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+
+        val collapseBtn = TextView(this).apply {
+            text = "−"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setPadding(dpToPx(6), 0, dpToPx(6), 0)
+        }
+
+        val closeBtn = TextView(this).apply {
+            text = "×"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setPadding(dpToPx(6), 0, dpToPx(6), 0)
+        }
+
+        titleBar.addView(titleText)
+        titleBar.addView(collapseBtn)
+        titleBar.addView(closeBtn)
+
+        // 日志内容区
+        val logContent = ScrollView(this).apply {
+            val bg = GradientDrawable().apply {
+                setColor(0xCC222222.toInt())
+            }
+            background = bg
+            isVerticalScrollBarEnabled = true
+        }
+
+        val logTv = TextView(this).apply {
+            text = ""
+            setTextColor(0xFFCCCCCC.toInt())
+            textSize = 11f
+            setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8))
+            setLineSpacing(2f, 1f)
+        }
+        floatingLogTextView = logTv
+
+        logContent.addView(logTv)
+
+        // 组装容器
+        val innerLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val bg = GradientDrawable().apply {
+                setColor(0x00000000)
+                cornerRadius = 12f * resources.displayMetrics.density
+            }
+            background = bg
+            // 裁剪圆角
+            clipToOutline = true
+        }
+        innerLayout.addView(titleBar, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, titleBarHeight
+        ))
+        innerLayout.addView(logContent, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, logMaxHeight - titleBarHeight
+        ))
+
+        container.addView(innerLayout, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT
+        ))
+
+        val params = WindowManager.LayoutParams(
+            logWidth,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 16
+            y = 100
+        }
+
+        // 拖拽 & 按钮
+        var dragInitialX = 0
+        var dragInitialY = 0
+        var dragTouchX = 0f
+        var dragTouchY = 0f
+        var isDrag = false
+
+        titleBar.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    dragInitialX = params.x
+                    dragInitialY = params.y
+                    dragTouchX = event.rawX
+                    dragTouchY = event.rawY
+                    isDrag = false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - dragTouchX
+                    val dy = event.rawY - dragTouchY
+                    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) isDrag = true
+                    if (isDrag) {
+                        params.x = dragInitialX + dx.toInt()
+                        params.y = dragInitialY + dy.toInt()
+                        try { windowManager?.updateViewLayout(container, params) } catch (_: Exception) {}
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (!isDrag) {
+                        // 点击标题栏不做任何事
+                    }
+                }
+            }
+            true
+        }
+
+        // 折叠/展开按钮
+        collapseBtn.setOnClickListener {
+            floatingLogCollapsed = !floatingLogCollapsed
+            logContent.visibility = if (floatingLogCollapsed) View.GONE else View.VISIBLE
+            collapseBtn.text = if (floatingLogCollapsed) "+" else "−"
+        }
+
+        // 关闭按钮 — 停止抢票并关闭日志
+        closeBtn.setOnClickListener {
+            ticketGrabEngine.stop()
+            removeFloatingLogInternal()
+        }
+
+        floatingLogParams = params
+        floatingLogView = container
+        try { windowManager?.addView(container, params) } catch (e: Exception) { e.printStackTrace() }
+    }
+
+    private fun appendFloatingLogInternal(msg: String) {
+        val tv = floatingLogTextView ?: return
+        val timeStr = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+            .format(java.util.Date())
+        val line = "$timeStr $msg"
+
+        logLines.add(line)
+        if (logLines.size > maxLogLines) {
+            logLines.removeAt(0)
+        }
+
+        try {
+            tv.text = logLines.joinToString("\n")
+            // 滚动到底部
+            val sv = tv.parent as? ScrollView
+            sv?.post { sv.fullScroll(View.FOCUS_DOWN) }
+        } catch (_: Exception) {}
+    }
+
+    private fun removeFloatingLogInternal() {
+        try { floatingLogView?.let { windowManager?.removeView(it) } } catch (_: Exception) {}
+        floatingLogView = null
+        floatingLogParams = null
+        floatingLogTextView = null
+        logLines.clear()
     }
 
     // ==================== 通用方法 ====================

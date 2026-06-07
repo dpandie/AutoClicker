@@ -30,6 +30,9 @@
     <!-- 抢购 -->
     <string name="toolbar_rush_buy">抢购</string>
 
+    <!-- 抢票 -->
+    <string name="toolbar_ticket">抢票</string>
+
     <!-- OCR模式 -->
     <string name="ocr_mode_title">OCR文字识别</string>
     <string name="ocr_target_text_hint">输入要匹配的文字</string>
@@ -41,4 +44,18 @@
     <string name="ocr_no_permission">请先开启无障碍服务和悬浮窗权限</string>
     <string name="ocr_capture_permission">需要屏幕录制权限才能截屏识别</string>
     <string name="ocr_empty_target">请先输入目标文字</string>
+
+    <!-- 设置菜单 -->
+    <string name="settings">设置</string>
+    <string name="menu_usage_guide">使用说明</string>
+    <string name="menu_about">关于我们</string>
+    <string name="usage_guide_title">使用说明</string>
+    <string name="usage_guide_content"></string>
+    <string name="guide_prep">1. 开启「无障碍服务」权限：在首页打开无障碍服务开关，跳转到系统设置页面，找到 AutoClicker 并开启\n2. 开启「悬浮窗权限」：在首页打开悬浮窗权限开关，跳转到系统设置页面，允许本应用显示悬浮窗</string>
+    <string name="guide_clicker">用途：在屏幕指定位置自动重复点击\n\n1. 点击底部「连点器」进入连点器页面\n2. 设置「点击间隔」：两次点击之间的等待时间，单位毫秒（如 100ms = 每秒点击 10 次）\n3. 设置「点击次数」：0 表示无限点击，直到手动停止\n4. 点击「开始连点」按钮\n5. 屏幕上出现悬浮球，将悬浮球拖动到需要点击的目标位置\n6. 单击悬浮球，开始自动连点\n7. 再次单击悬浮球，停止连点\n8. 连点过程中可随时拖动悬浮球调整位置</string>
+    <string name="guide_rush_buy">用途：在指定坐标位置快速自动点击，适用于抢购场景\n\n1. 点击底部「抢购」进入抢购页面\n2. 设置「目标 X 坐标」：要点击位置的横向坐标（像素）\n3. 设置「目标 Y 坐标」：要点击位置的纵向坐标（像素）\n4. 可通过截图或开发者工具获取目标坐标\n5. 设置「点击间隔」：建议设置为 50-100 毫秒\n6. 设置「点击次数」：建议设置为 0（无限点击），手动停止\n7. 设置「持续时长」：自动停止的时间（秒），0 表示不自动停止\n8. 点击「开始抢购」，引擎将在目标坐标位置持续快速点击\n9. 在抢购页面可实时查看运行状态，点击「停止抢购」结束</string>
+    <string name="guide_ticket">用途：通过无障碍节点自动操作大麦 APP，自动选座提交订单\n\n1. 点击底部「抢票」进入抢票配置页面\n2. 在「场次」区域：输入想要抢的演出场次关键词（如\"周六\"\"晚场\"），点击添加，可添加多个作为备选\n3. 在「价位」区域：输入可接受的票价档位关键词（如\"580\"\"880\"），点击添加，可添加多个作为备选\n4. 在「观演人」区域：输入观演人姓名，点击添加，可添加多位观演人\n5. 展开「高级设置」可调整：\n   - 操作间隔（毫秒）：每步操作之间的等待时间，建议 200-500\n   - 最大重试次数：售罄后重新尝试的次数，建议 50-100\n6. 打开大麦 APP，进入目标演出的详情页面（停留在演出详情页即可）\n7. 回到本应用，点击「开始抢票」按钮\n8. 引擎将自动执行以下流程：\n   ① 自动点击「选择场次」并匹配预设场次\n   ② 自动点击「选择价位」并匹配预设价位\n   ③ 自动勾选观演人\n   ④ 自动点击「提交订单」\n9. 抢票过程中会显示悬浮日志窗口，实时展示每步操作状态\n10. 抢票成功后会自动停止，售罄时会自动重试\n11. 可随时点击「停止抢票」手动终止</string>
+    <string name="guide_notice">• 抢票前请确保大麦 APP 已登录且收货地址、观演人等信息已填写完整\n• 抢票速度受网络环境和服务器响应影响，本工具仅辅助操作，不保证一定成功\n• 请合理设置操作间隔，过快可能被系统限制</string>
+    <string name="about_title">关于我们</string>
+    <string name="about_content">AutoClicker 自动连点器\n\n版本：1.0.0\n\n一款多功能自动化工具，支持连点、抢购、抢票等功能。\n\n通过无障碍服务实现自动化操作，让重复性任务变得更简单高效。</string>
 </resources>

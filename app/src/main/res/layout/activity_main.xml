@@ -12,23 +12,42 @@
         android:background="@color/colorPrimary"
         android:gravity="center_vertical"
         android:paddingStart="20dp"
-        android:paddingEnd="20dp"
-        android:orientation="vertical">
+        android:paddingEnd="12dp"
+        android:orientation="horizontal">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="@string/home_title"
-            android:textColor="@color/white"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+            android:layout_weight="1"
+            android:orientation="vertical">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/home_subtitle"
-            android:textColor="#CCFFFFFF"
-            android:textSize="12sp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/home_title"
+                android:textColor="@color/white"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/home_subtitle"
+                android:textColor="#CCFFFFFF"
+                android:textSize="12sp" />
+
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/btnSettings"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
+            android:src="@drawable/ic_settings"
+            android:contentDescription="@string/settings"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true" />
 
     </LinearLayout>
 
@@ -175,42 +194,6 @@
 
             </androidx.cardview.widget.CardView>
 
-            <!-- 使用提示 -->
-            <androidx.cardview.widget.CardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp"
-                app:cardBackgroundColor="@color/bg_card"
-                xmlns:app="http://schemas.android.com/apk/res-auto">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="使用说明"
-                        android:textSize="16sp"
-                        android:textColor="@color/text_primary"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:textSize="13sp"
-                        android:textColor="@color/text_secondary"
-                        android:lineSpacingExtra="4dp"
-                        android:text="1. 先开启无障碍服务和悬浮窗权限\n2. 点击底部「连点器」进入功能页\n3. 设置参数后点击开始\n4. 将悬浮球拖到目标位置\n5. 单击悬浮球即可开始/停止连点" />
-
-                </LinearLayout>
-
-            </androidx.cardview.widget.CardView>
-
         </LinearLayout>
 
     </ScrollView>
@@ -274,6 +257,33 @@
                 android:text="@string/toolbar_rush_buy"
                 android:textSize="11sp"
                 android:textColor="#FFFF9800"
+                android:layout_marginTop="2dp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tabTicket"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_ticket"
+                android:contentDescription="抢票" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/toolbar_ticket"
+                android:textSize="11sp"
+                android:textColor="#FFE91E63"
                 android:layout_marginTop="2dp" />
 
         </LinearLayout>

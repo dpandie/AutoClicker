@@ -35,6 +35,11 @@
             android:name=".RushBuyActivity"
             android:exported="false" />
 
+        <!-- 抢票页面 -->
+        <activity
+            android:name=".DaMaiTicketActivity"
+            android:exported="false" />
+
         <!-- 屏幕截屏服务（OCR 需要） -->
         <service
             android:name=".ScreenCaptureService"
